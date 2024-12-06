@@ -1,53 +1,29 @@
-import threading
-from flask import Blueprint, jsonify, request
 import requests
 from bs4 import BeautifulSoup
-import logging
 
-def create_scraper_blueprint():
-    scraper_bp = Blueprint('scraper', __name__)
+def scrape_jobs(keyword):
+    base_url = "https://wellfound.com/jobs"
+    search_url = f"{base_url}?q={keyword.replace(' ', '+')}"
+    response = requests.get(search_url)
     
-    @scraper_bp.route('/scrape', methods=['POST'])
-    def scrape_jobs():
-        data = request.json
-        keyword = data.get('keyword', '')
-        
-        if not keyword:
-            return jsonify({'error': 'Keyword is required'}), 400
-        
-        try:
-            jobs = scrape_wellfound(keyword)
-            return jsonify(jobs)
-        except Exception as e:
-            logging.error(f"Scraping error: {e}")
-            return jsonify({'error': 'Scraping failed'}), 500
+    if response.status_code != 200:
+        return {"error": "Failed to fetch jobs from Wellfound"}
     
-    return scraper_bp
-
-def scrape_wellfound(keyword):
-    url = f"https://wellfound.com/jobs?q={keyword}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)"
-    }
-    
-    response = requests.get(url, headers=headers)
     soup = BeautifulSoup(response.text, 'html.parser')
-    
+    job_cards = soup.find_all('div', class_='job-listing')  # Adjust based on real structure
     jobs = []
-    job_listings = soup.select('.job-card')
-    
-    for job in job_listings[:15]:
-        try:
-            company = job.select_one('.company-name').text.strip()
-            title = job.select_one('.job-title').text.strip()
-            location = job.select_one('.job-location').text.strip() if job.select_one('.job-location') else 'N/A'
-            
-            jobs.append({
-                'company': company,
-                'title': title,
-                'location': location
-            })
-        except Exception as e:
-            logging.warning(f"Could not parse job: {e}")
-    
+
+    for job in job_cards[:3]:  # Fetch only the first 3 jobs as a sample
+        title = job.find('h2').text.strip() if job.find('h2') else "N/A"
+        company = job.find('h3').text.strip() if job.find('h3') else "N/A"
+        location = job.find('span', class_='location').text.strip() if job.find('span', class_='location') else "Remote"
+        link = base_url + job.find('a')['href'] if job.find('a') else "#"
+
+        jobs.append({
+            "job_title": title,
+            "company_name": company,
+            "location": location,
+            "job_link": link
+        })
+
     return jobs
