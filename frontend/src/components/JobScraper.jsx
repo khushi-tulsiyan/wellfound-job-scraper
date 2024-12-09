@@ -1,66 +1,60 @@
 import React, { useState } from 'react';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import axios from 'axios';
 
-export function JobScraper() {
+const JobScraper = () => {
   const [keyword, setKeyword] = useState('');
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState('');
 
-  const handleScrape = async () => {
-    if (!keyword) return;
+  const handleSearch = async () => {
+    if (!keyword.trim()) return;
 
     setLoading(true);
+    setError('');
     try {
-      const response = await fetch('/api/scrape', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ keyword })
-      });
-      
-      const data = await response.json();
-      setJobs(data);
-    } catch (error) {
-      console.error('Scraping failed:', error);
+      const response = await axios.get(`/api/scrape?keyword=${keyword}`);
+      setJobs(response.data);
+    } catch (err) {
+      setError('Failed to fetch data. Please try again.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="space-y-4">
-      <div className="flex space-x-2">
-        <Input
+    <div>
+      <div>
+        <input
+          type="text"
+          placeholder="Enter keyword"
           value={keyword}
           onChange={(e) => setKeyword(e.target.value)}
-          placeholder="Enter job keyword"
         />
-        <Button onClick={handleScrape} disabled={loading}>
-          {loading ? 'Scraping...' : 'Scrape Jobs'}
-        </Button>
+        <button onClick={handleSearch}>Search Jobs</button>
       </div>
-
-      {jobs.length > 0 && (
-        <Card>
-          <CardHeader>
-            <CardTitle>Job Listings</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="grid gap-4">
-              {jobs.map((job, index) => (
-                <div key={index} className="border p-4 rounded">
-                  <h3 className="font-bold">{job.title}</h3>
-                  <p className="text-muted-foreground">{job.company}</p>
-                  <p className="text-sm">{job.location}</p>
-                </div>
-              ))}
-            </div>
-          </CardContent>
-        </Card>
-      )}
+      {loading && <p>Loading...</p>}
+      {error && <p style={{ color: 'red' }}>{error}</p>}
+      <div>
+        {jobs.length > 0 ? (
+          <ul>
+            {jobs.map((job, index) => (
+              <li key={index}>
+                <h3>{job.job_title}</h3>
+                <p>{job.company_name}</p>
+                <p>{job.location}</p>
+                <a href={job.job_link} target="_blank" rel="noopener noreferrer">
+                  View Job
+                </a>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          !loading && <p>No jobs found.</p>
+        )}
+      </div>
     </div>
   );
-}
+};
+
+export default JobScraper;

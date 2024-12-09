@@ -1,20 +1,30 @@
-import os
-from flask import Flask
-from flask_cors import CORS
-from scraper.wellfound_scraper import create_scraper_blueprint
+from flask import Flask, jsonify, request
+from scraper.wellfound_scraper import scrape_jobs
+from threading import Thread
 
-def create_app():
-    app = Flask(__name__)
-    CORS(app)
+app = Flask(__name__)
 
-    # Register blueprints
-    app.register_blueprint(create_scraper_blueprint(), url_prefix='/api')
+def threaded_scrape(keyword, result):
+    result['data'] = scrape_jobs(keyword)
 
-    # Configuration
-    app.config['DEBUG'] = os.environ.get('FLASK_DEBUG', True)
+
+@app.route('/')
+def home():
+    return "Welcome to the Wellfound Job Scraper API. Use /scrape endpoint with a keyword."
+
+
+@app.route('/scrape', methods=['GET'])
+def scrape_endpoint():
+    keyword = request.args.get('keyword', default='', type=str)
+    if not keyword:
+        return jsonify({"error": "Keyword is required"}), 400
+
+    result = {}
+    thread = Thread(target=threaded_scrape, args=(keyword, result))
+    thread.start()
+    thread.join()  # Wait for the thread to finish
     
-    return app
+    return jsonify(result.get('data', []))
 
-if __name__ == '__main__':
-    app = create_app()
-    app.run(host='0.0.0.0', port=5000)
+if __name__ == "__main__":
+    app.run(debug=True)
